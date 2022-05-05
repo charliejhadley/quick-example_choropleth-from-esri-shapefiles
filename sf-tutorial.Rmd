@@ -1,0 +1,110 @@
+---
+title: "Untitled"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Importing shapefiles
+
+This is done with {sf}
+
+```{r}
+library(tidyverse)
+library(sf)
+
+world_sf <- read_sf("data/world-shape-files/ne_110m_admin_0_countries.shp")
+```
+
+```{r}
+world_sf %>% 
+  # filter(POP_EST > 100E6) %>% 
+  ggplot() +
+  geom_sf(aes(fill = POP_EST))
+```
+
+
+
+
+```{r}
+world_sf %>% 
+  mutate(
+    is_valid = st_is_valid(geometry)) %>% 
+  filter(is_valid == TRUE) %>% 
+  mutate(area = st_area(geometry),
+         pop_density = POP_EST / area) %>% 
+  mutate(pop_density = as.numeric(pop_density)) %>% 
+  ggplot() +
+  geom_sf(aes(fill = pop_density)) +
+  scale_fill_viridis_c(name = "Population density", labels = scales::number_format()) +
+  labs(title = "Country population density")
+```
+
+# Interactive maps
+
+{leaflet} is the best choice
+
+```{r}
+library(leaflet)
+
+pal_pop_est <- colorNumeric("viridis",  world_sf$POP_EST)
+
+label_country_pop <- function(country_name, population){
+  paste(country_name, "has a population of", scales::number(population, scale = 1E-6, suffix = "Million", accuracy = 1))
+}
+
+world_sf %>% 
+  leaflet() %>% 
+  addProviderTiles(provider = providers$OpenStreetMap) %>% 
+  addPolygons(fillColor = ~pal_pop_est(POP_EST),
+              weight = 1,
+              fillOpacity = 0.9,
+              color = "white",
+              popup = ~label_country_pop(NAME, POP_EST),
+              label = ~NAME) %>% 
+  addLegend(pal = pal_pop_est,
+            values = ~POP_EST,
+            opacity = 0.9)
+
+
+```
+
+The str_glue() function allows us to construct sentences more easily
+
+```{r}
+label_country_pop <- function(country_name, population){
+  str_glue(
+    "<b>Country:</b> {country_name}
+    <br>
+    <b>Population:</b> {scales::number(population, scale = 1E-6, suffix = ' Million', accuracy = 1)},
+    <br>
+    <b>More information: <a href='https://en.wikipedia.org/wiki/{snakecase::to_snake_case(country_name)}'>{country_name} Wikipedia page</a>"
+)
+}
+
+world_sf %>% 
+  leaflet() %>% 
+  addProviderTiles(provider = providers$OpenStreetMap) %>% 
+  addPolygons(fillColor = ~pal_pop_est(POP_EST),
+              weight = 1,
+              fillOpacity = 0.9,
+              color = "white",
+              popup = ~label_country_pop(NAME, POP_EST),
+              label = ~NAME) %>% 
+  addLegend(pal = pal_pop_est,
+            values = ~POP_EST,
+            opacity = 0.9)
+
+```
+
+
+
+
+
+
+
+
+
